@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
@@ -197,9 +198,10 @@ class BookingView(APIView):
 
             # Verificar si el asiento está disponible
             try:
-                seat = Seat.objects.get(
+                seat = Seat.objects.filter(
                     airplane=flight.airplane, seat_number=seat_number, is_reserved=False
-                )
+                ).first()
+
             except Seat.DoesNotExist:
                 return Response(
                     {"error": "El asiento no está disponible."},
@@ -239,16 +241,28 @@ class BookingView(APIView):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
-            # Loguea el error detalladamente
-            logger.error(f"Error al crear la reserva: {str(e)}")
-            logger.error(
-                traceback.format_exc()
-            )  # Muestra el traceback completo para depurar
+        except Flight.DoesNotExist:
             return Response(
-                {"error": "Ocurrió un error al crear la reserva."},
+                {"error": "Vuelo no encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Seat.DoesNotExist:
+            return Response(
+                {"error": "El asiento no está disponible o ya fue reservado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error(f"Error al crear la reserva: {str(e)}")
+            logger.error(traceback.format_exc())
+            return Response(
+                {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class BookingDetailView(RetrieveAPIView):
+    queryset = Booking.objects.all()
+    serializer_class = BookingSerializer
 
 
 class SeatListView(APIView):

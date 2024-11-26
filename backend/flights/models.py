@@ -32,7 +32,11 @@ class Seat(models.Model):
             ("economy_class", "Clase Económica"),
         ],
     )
+
     is_reserved = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("airplane", "seat_number")
 
     def __str__(self):
         return f"Seat {self.seat_number} ({self.seat_class}) in {self.airplane.name}"
@@ -98,7 +102,7 @@ class Booking(models.Model):
         }
 
         # Ajuste por clase de asiento
-        seat_class_multiplier = seat_price_multiplier[self.seat.seat_class]
+        seat_class_multiplier = seat_price_multiplier.get(self.seat.seat_class, 1.0)
 
         # Precio por cantidad de pasajeros
         passenger_count = self.passengers.count()
