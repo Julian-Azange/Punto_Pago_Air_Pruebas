@@ -61,7 +61,7 @@ class FlightSearchView(APIView):
             hours, minutes = divmod(duration, 60)
             flight_data = FlightSerializer(flight).data
             flight_data["duration"] = f"{int(hours)} horas, {int(minutes)} minutos"
-            flight_data["price"] = f"${flight.price:,.2f} COP"
+            flight_data["price"] = f"${flight.price:,.3f} COP"
             direct_flight_data.append(flight_data)
 
         # Buscar rutas con escalas

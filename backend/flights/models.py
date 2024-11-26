@@ -54,7 +54,7 @@ class Flight(models.Model):
     days_of_week = models.CharField(max_length=100)  # ej. "Monday,Wednesday,Friday"
     available_seats = models.IntegerField(default=0)
     airplane = models.ForeignKey(
-        Airplane, related_name="flights", on_delete=models.CASCADE
+        Airplane, related_name="airplanes", on_delete=models.CASCADE
     )
     price = models.DecimalField(
         max_digits=12, decimal_places=2, default=0.00
@@ -103,9 +103,9 @@ class Booking(models.Model):
     def calculate_price(self):
         base_price = Decimal("100.00")  # Este sería el precio base del vuelo
         seat_price_multiplier = {
-            "first_class": Decimal("1.0"),
+            "first_class": Decimal("1.07"),
             "business_class": Decimal("1.05"),
-            "economy_class": Decimal("1.07"),
+            "economy_class": Decimal("1.00"),
         }
 
         # Ajuste por clase de asiento
