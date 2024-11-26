@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
@@ -60,6 +61,7 @@ class FlightSearchView(APIView):
             hours, minutes = divmod(duration, 60)
             flight_data = FlightSerializer(flight).data
             flight_data["duration"] = f"{int(hours)} horas, {int(minutes)} minutos"
+            flight_data["price"] = f"${flight.price:,.2f} COP"
             direct_flight_data.append(flight_data)
 
         # Buscar rutas con escalas
@@ -131,6 +133,7 @@ class FlightSearchView(APIView):
                             "arrival_time": arrival_datetime.strftime(
                                 "%Y-%m-%d %H:%M:%S"
                             ),
+                            "price": f"${flight.price:,.2f} COP",
                         }
                     ]
 
@@ -197,12 +200,11 @@ class BookingView(APIView):
             flight = get_object_or_404(Flight, id=flight_id)
 
             # Verificar si el asiento está disponible
-            try:
-                seat = Seat.objects.filter(
-                    airplane=flight.airplane, seat_number=seat_number, is_reserved=False
-                ).first()
+            seat = Seat.objects.filter(
+                airplane=flight.airplane, seat_number=seat_number, is_reserved=False
+            ).first()
 
-            except Seat.DoesNotExist:
+            if not seat:
                 return Response(
                     {"error": "El asiento no está disponible."},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -246,11 +248,6 @@ class BookingView(APIView):
                 {"error": "Vuelo no encontrado."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        except Seat.DoesNotExist:
-            return Response(
-                {"error": "El asiento no está disponible o ya fue reservado."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         except Exception as e:
             logger.error(f"Error al crear la reserva: {str(e)}")
             logger.error(traceback.format_exc())
@@ -263,6 +260,14 @@ class BookingView(APIView):
 class BookingDetailView(RetrieveAPIView):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
+
+    def get_object(self):
+        try:
+            return super().get_object()
+        except Booking.DoesNotExist:
+            raise NotFound(
+                detail="La reserva solicitada no existe o ha sido eliminada."
+            )
 
 
 class SeatListView(APIView):

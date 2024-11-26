@@ -10,6 +10,9 @@ class Command(BaseCommand):
         self.populate_data()
 
     def populate_data(self):
+        # Eliminar todos los asientos antes de poblar nuevos datos
+        Seat.objects.all().delete()
+
         # Crear aeropuertos
         airports = [
             {"code": "BOG", "name": "Bogotá"},
