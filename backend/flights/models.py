@@ -1,6 +1,6 @@
 from django.db import models
 from decimal import Decimal
-
+import uuid
 
 class Airport(models.Model):
     code = models.CharField(max_length=3, unique=True)
@@ -9,6 +9,7 @@ class Airport(models.Model):
     def __str__(self):
         return f"{self.code} - {self.name}"
 
+# Origen - destino - info escalas/vuelos - reserva
 
 class Airplane(models.Model):
     name = models.CharField(max_length=100)
@@ -126,8 +127,8 @@ class Booking(models.Model):
             price += Decimal(self.extra_meal) * Decimal("1.00") / Decimal("100.00")  # 1% por cada comida adicional
 
         # Guardar el precio total
-        self.total_price = price
-        self.save()
+        return self.total_price + price
+    
 
 class Reservation(models.Model):
     flight = models.ForeignKey(Flight, on_delete=models.CASCADE)
@@ -139,6 +140,15 @@ class Reservation(models.Model):
     customer_name = models.CharField(max_length=255)
     customer_email = models.EmailField()
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    payment_status = models.CharField(max_length=30, default="pendiente")
 
     def __str__(self):
         return f"Reservation for {self.customer_name} on {self.flight}"
+
+class ReservationPaymentCode(models.Model):
+    payment_code = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    reservation = models.OneToOneField(Reservation, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+# TODO: añadir tabla de transaccion con cod -> verificar transaccion y pago
+

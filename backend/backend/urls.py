@@ -33,5 +33,7 @@ urlpatterns = [
         "api/bookings/<int:pk>/",
         views.BookingDetailView.as_view(),
         name="booking-detail",
-    ),
+    )
+
 ]
+# path("api/reservation/<int:reservation:id>/payment-code", views.ReservationPaymentDetailView.as_view(), name="reservation")
