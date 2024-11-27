@@ -108,7 +108,7 @@ class Booking(models.Model):
         return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
 
     def calculate_price(self):
-        base_price = Decimal("100.00")  # Este sería el precio base del vuelo
+        base_price = self.flight.price  # Precio base del vuelo
         seat_price_multiplier = {
             "first_class": Decimal("1.07"),
             "business_class": Decimal("1.05"),
@@ -121,8 +121,12 @@ class Booking(models.Model):
         )
 
         # Precio por cantidad de pasajeros
-        passenger_count = Decimal(self.passengers.count())
-        price = base_price * passenger_count * seat_class_multiplier
+        price = base_price * seat_class_multiplier
+        for passenger in self.passengers.all():
+            if not passenger.is_infant:
+                price += base_price * Decimal(
+                    "0.10"
+                )  # 10% por cada pasajero mayor de 2 años
 
         # Ajuste por equipaje
         if self.luggage_hold:
@@ -159,9 +163,11 @@ class Reservation(models.Model):
     def __str__(self):
         return f"Reservation for {self.customer_name} on {self.flight}"
 
+
 class ReservationPaymentCode(models.Model):
     payment_code = models.UUIDField(primary_key=True, default=uuid.uuid4)
     reservation = models.OneToOneField(Reservation, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+
 
 # TODO: añadir tabla de transaccion con cod -> verificar transaccion y pago

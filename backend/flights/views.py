@@ -199,7 +199,9 @@ class BookingView(APIView):
         try:
             route_flights = data.get("flights")  # Ahora esperamos una lista de vuelos
             passenger_info = data.get("passengers")
-            seat_numbers = data.get("seat_numbers")  # Cada vuelo debe tener un asiento reservado
+            seat_numbers = data.get(
+                "seat_numbers"
+            )  # Cada vuelo debe tener un asiento reservado
             luggage_hand = data.get("luggage_hand", False)
             luggage_hold = data.get("luggage_hold", False)
             extra_luggage = data.get("extra_luggage", 0)
@@ -214,11 +216,15 @@ class BookingView(APIView):
             # Validar que la cantidad de vuelos y asientos proporcionados coincidan
             if len(route_flights) != len(seat_numbers):
                 return Response(
-                    {"error": "Debe proporcionar un número de asientos igual al número de vuelos."},
+                    {
+                        "error": "Debe proporcionar un número de asientos igual al número de vuelos."
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            total_price = Decimal("0.00")  # Inicializar el precio total para toda la reserva
+            total_price = Decimal(
+                "0.00"
+            )  # Inicializar el precio total para toda la reserva
             passengers = []
 
             # Crear los pasajeros (esto es común para todos los vuelos de la ruta)
@@ -248,8 +254,10 @@ class BookingView(APIView):
 
                 if not seat:
                     return Response(
-                        {"error": f"El asiento {seat_number} no está disponible en el vuelo {flight_id}."},
-                        status=status.HTTP_400_BAD_REQUEST
+                        {
+                            "error": f"El asiento {seat_number} no está disponible en el vuelo {flight_id}."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
 
                 # Crear la reserva para el vuelo actual
@@ -290,7 +298,6 @@ class BookingView(APIView):
                 {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 
 class BookingDetailView(RetrieveAPIView):
