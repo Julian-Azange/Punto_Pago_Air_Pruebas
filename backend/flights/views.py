@@ -199,31 +199,36 @@ class BookingView(APIView):
         data = request.data
 
         try:
-            route_flights = data.get("flights")  # Ahora esperamos una lista de vuelos
+            flight_id = data.get("flight_id")
             passenger_info = data.get("passengers")
-            seat_numbers = data.get("seat_numbers")  # Cada vuelo debe tener un asiento reservado
             luggage_hand = data.get("luggage_hand", False)
             luggage_hold = data.get("luggage_hold", False)
             extra_luggage = data.get("extra_luggage", 0)
             extra_meal = data.get("extra_meal", 0)
 
-            if not route_flights or not passenger_info or not seat_numbers:
+            if not flight_id or not passenger_info:
                 return Response(
                     {"error": "Faltan datos requeridos."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Validar que la cantidad de vuelos y asientos proporcionados coincidan
-            if len(route_flights) != len(seat_numbers):
+            # Verificar si el vuelo existe
+            flight = get_object_or_404(Flight, id=flight_id)
+
+            # Verificar la disponibilidad de asientos
+            required_seats = len(passenger_info)
+            available_seats = Seat.objects.filter(
+                airplane=flight.airplane, is_reserved=False
+            )[:required_seats]
+
+            if len(available_seats) < required_seats:
                 return Response(
-                    {"error": "Debe proporcionar un número de asientos igual al número de vuelos."},
+                    {"error": "No hay suficientes asientos disponibles."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            total_price = Decimal("0.00")  # Inicializar el precio total para toda la reserva
+            # Crear los pasajeros
             passengers = []
-
-            # Crear los pasajeros (esto es común para todos los vuelos de la ruta)
             for passenger in passenger_info:
                 p = Passenger.objects.create(
                     first_name=passenger["first_name"],
@@ -234,49 +239,28 @@ class BookingView(APIView):
                 )
                 passengers.append(p)
 
-            # Reservar cada vuelo de la ruta
-            bookings = []
-            for i, flight_data in enumerate(route_flights):
-                flight_id = flight_data.get("flight_id")
-                seat_number = seat_numbers[i]
+            # Crear la reserva
+            booking = Booking.objects.create(
+                flight=flight,
+                luggage_hand=luggage_hand,
+                luggage_hold=luggage_hold,
+                extra_luggage=extra_luggage,
+                extra_meal=extra_meal,
+            )
+            booking.passengers.set(passengers)
+            booking.seats.set(available_seats)
 
-                # Verificar si el vuelo existe
-                flight = get_object_or_404(Flight, id=flight_id)
-
-                # Verificar si el asiento está disponible
-                seat = Seat.objects.filter(
-                    airplane=flight.airplane, seat_number=seat_number, is_reserved=False
-                ).first()
-
-                if not seat:
-                    return Response(
-                        {"error": f"El asiento {seat_number} no está disponible en el vuelo {flight_id}."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                # Crear la reserva para el vuelo actual
-                booking = Booking.objects.create(
-                    flight=flight,
-                    seat=seat,
-                    luggage_hand=luggage_hand,
-                    luggage_hold=luggage_hold,
-                    extra_luggage=extra_luggage,
-                    extra_meal=extra_meal,
-                )
-                booking.passengers.set(passengers)
-                booking.total_price = booking.calculate_price()
-                booking.save()
-
-                # Marcar el asiento como reservado
+            # Marcar los asientos como reservados
+            for seat in available_seats:
                 seat.is_reserved = True
                 seat.save()
 
-                # Sumar el precio de este vuelo al precio total de la reserva con escalas
-                total_price += booking.total_price
-                bookings.append(booking)
+            # Calcular el precio total
+            booking.total_price = booking.calculate_price()
+            booking.save()
 
-            # Crear una respuesta que incluya todas las reservas realizadas
-            serializer = BookingSerializer(bookings, many=True)
+            # Serializar la respuesta
+            serializer = BookingSerializer(booking)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -292,7 +276,6 @@ class BookingView(APIView):
                 {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 
 class BookingDetailView(RetrieveAPIView):
@@ -322,7 +305,6 @@ class BookingDetailView(RetrieveAPIView):
             raise NotFound(
                 detail="La reserva solicitada no existe o ha sido eliminada."
             )
-        
 
 
 class SeatListView(APIView):

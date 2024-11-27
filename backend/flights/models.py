@@ -89,7 +89,7 @@ class Passenger(models.Model):
 class Booking(models.Model):
     flight = models.ForeignKey(Flight, on_delete=models.CASCADE)
     passengers = models.ManyToManyField(Passenger)
-    seat = models.ForeignKey(Seat, on_delete=models.CASCADE)
+    seats = models.ManyToManyField(Seat)
     booking_date = models.DateTimeField(auto_now_add=True)
     luggage_hand = models.BooleanField(default=False)  # Equipaje de mano (10kg)
     luggage_hold = models.BooleanField(default=False)  # Equipaje de bodega (23kg)
@@ -108,7 +108,7 @@ class Booking(models.Model):
         return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
 
     def calculate_price(self):
-        base_price = Decimal("100.00")  # Este sería el precio base del vuelo
+        base_price = self.flight.price
         seat_price_multiplier = {
             "first_class": Decimal("1.07"),
             "business_class": Decimal("1.05"),
@@ -116,13 +116,20 @@ class Booking(models.Model):
         }
 
         # Ajuste por clase de asiento
-        seat_class_multiplier = seat_price_multiplier.get(
-            self.seat.seat_class, Decimal("1.0")
-        )
+        seat_class_multiplier = Decimal("1.00")
+        for seat in self.seats.all():
+            seat_class_multiplier = seat_price_multiplier.get(
+                seat.seat_class, Decimal("1.0")
+            )
 
         # Precio por cantidad de pasajeros
         passenger_count = Decimal(self.passengers.count())
         price = base_price * passenger_count * seat_class_multiplier
+
+        # Ajuste por pasajeros menores de 2 años (gratis)
+        infant_count = self.passengers.filter(is_infant=True).count()
+        if infant_count > 0:
+            price -= base_price * Decimal(infant_count)
 
         # Ajuste por equipaje
         if self.luggage_hold:
@@ -159,9 +166,11 @@ class Reservation(models.Model):
     def __str__(self):
         return f"Reservation for {self.customer_name} on {self.flight}"
 
+
 class ReservationPaymentCode(models.Model):
     payment_code = models.UUIDField(primary_key=True, default=uuid.uuid4)
     reservation = models.OneToOneField(Reservation, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+
 
 # TODO: añadir tabla de transaccion con cod -> verificar transaccion y pago
