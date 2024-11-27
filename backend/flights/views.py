@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.exceptions import NotFound
@@ -103,7 +104,7 @@ class FlightSearchView(APIView):
                 flight_details,
             ) = queue.popleft()
 
-# TODO: añadir verificación hora == 1 ? 'hora' : 'horas'
+            # TODO: añadir verificación hora == 1 ? 'hora' : 'horas'
 
             if current_airport == destination and len(path) > 2:
                 hours, minutes = divmod(total_duration, 60)
@@ -196,43 +197,31 @@ class BookingView(APIView):
         data = request.data
 
         try:
-            flight_id = data.get("flight_id")
+            route_flights = data.get("flights")  # Ahora esperamos una lista de vuelos
             passenger_info = data.get("passengers")
-            seat_number = data.get("seat_number")
+            seat_numbers = data.get("seat_numbers")  # Cada vuelo debe tener un asiento reservado
             luggage_hand = data.get("luggage_hand", False)
             luggage_hold = data.get("luggage_hold", False)
             extra_luggage = data.get("extra_luggage", 0)
             extra_meal = data.get("extra_meal", 0)
 
-            if not flight_id or not passenger_info or not seat_number:
+            if not route_flights or not passenger_info or not seat_numbers:
                 return Response(
                     {"error": "Faltan datos requeridos."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Verificar si el vuelo existe
-            flight = get_object_or_404(Flight, id=flight_id)
-
-            # Verificar si el asiento está disponible
-            seat = Seat.objects.filter(
-                airplane=flight.airplane, seat_number=seat_number, is_reserved=False
-            ).first()
-
-            if not seat:
+            # Validar que la cantidad de vuelos y asientos proporcionados coincidan
+            if len(route_flights) != len(seat_numbers):
                 return Response(
-                    {"error": "El asiento no está disponible."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-
-            if len(passenger_info)>9:
-                return Response(
-                    {"error":"Más de 9 pasajeros incluidos."},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "Debe proporcionar un número de asientos igual al número de vuelos."},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Crear los pasajeros
+            total_price = Decimal("0.00")  # Inicializar el precio total para toda la reserva
             passengers = []
+
+            # Crear los pasajeros (esto es común para todos los vuelos de la ruta)
             for passenger in passenger_info:
                 p = Passenger.objects.create(
                     first_name=passenger["first_name"],
@@ -243,48 +232,49 @@ class BookingView(APIView):
                 )
                 passengers.append(p)
 
-            # Crear la reserva
-            booking = Booking.objects.create(
-                flight=flight,
-                seat=seat,
-                luggage_hand=luggage_hand,
-                luggage_hold=luggage_hold,
-                extra_luggage=extra_luggage,
-                extra_meal=extra_meal,
-            )
-            booking.passengers.set(passengers)
-            booking.total_price=booking.calculate_price()
-            booking.calculate_price()  # Calcula el precio total y lo guarda
+            # Reservar cada vuelo de la ruta
+            bookings = []
+            for i, flight_data in enumerate(route_flights):
+                flight_id = flight_data.get("flight_id")
+                seat_number = seat_numbers[i]
 
-            # Reservar el asiento
-            seat.is_reserved = True
-            
-            reservation = Reservation.objects.create(
-                flight=self.flight,
-                passengers=len(passengers),
-                luggage_hand=luggage_hand,
-                luggage_baggage=False,
-                infant=False,
-                seat=self.seat,
-                customer_name="Example customer",
-                customer_email="email@ejemplo.com",
-                payment_status = "pendiente"
-            )
+                # Verificar si el vuelo existe
+                flight = get_object_or_404(Flight, id=flight_id)
 
-            reservation.total_price=booking.calculate_price()
+                # Verificar si el asiento está disponible
+                seat = Seat.objects.filter(
+                    airplane=flight.airplane, seat_number=seat_number, is_reserved=False
+                ).first()
 
-            booking.save()
-            seat.save()
-            reservation.save()
+                if not seat:
+                    return Response(
+                        {"error": f"El asiento {seat_number} no está disponible en el vuelo {flight_id}."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
-            reservation_code = ReservationPaymentCode.objects.create(
-                reservation = reservation
-            )
+                # Crear la reserva para el vuelo actual
+                booking = Booking.objects.create(
+                    flight=flight,
+                    seat=seat,
+                    luggage_hand=luggage_hand,
+                    luggage_hold=luggage_hold,
+                    extra_luggage=extra_luggage,
+                    extra_meal=extra_meal,
+                )
+                booking.passengers.set(passengers)
+                booking.total_price = booking.calculate_price()
+                booking.save()
 
-            reservation_code.save()
+                # Marcar el asiento como reservado
+                seat.is_reserved = True
+                seat.save()
 
-            # Serializar la respuesta
-            serializer = BookingSerializer(booking)
+                # Sumar el precio de este vuelo al precio total de la reserva con escalas
+                total_price += booking.total_price
+                bookings.append(booking)
+
+            # Crear una respuesta que incluya todas las reservas realizadas
+            serializer = BookingSerializer(bookings, many=True)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -300,6 +290,7 @@ class BookingView(APIView):
                 {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
 
 class BookingDetailView(RetrieveAPIView):

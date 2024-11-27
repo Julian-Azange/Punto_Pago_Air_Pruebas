@@ -106,7 +106,7 @@ class Command(BaseCommand):
                 "destination": "CTG",
                 "departure_time": "09:00",
                 "arrival_time": "10:45",
-                "days_of_week": "Monday, Saturday",
+                "days_of_week": "Monday, Saturday, Thursday",
                 "airplane": airplane_instances[0],
             },
             # Vuelos directos desde Medellín
@@ -124,6 +124,14 @@ class Command(BaseCommand):
                 "departure_time": "13:00",
                 "arrival_time": "14:15",
                 "days_of_week": "Monday, Thursday",
+                "airplane": airplane_instances[0],
+            },
+            {
+                "origin": "MDE",
+                "destination": "CTG",
+                "departure_time": "12:00",
+                "arrival_time": "13:30",
+                "days_of_week": "Thursday",
                 "airplane": airplane_instances[0],
             },
             # Vuelos directos desde Cali
@@ -150,6 +158,15 @@ class Command(BaseCommand):
                 "departure_time": "15:00",
                 "arrival_time": "16:00",
                 "days_of_week": "Friday, Sunday",
+                "airplane": airplane_instances[1],
+            },
+            # Vuelos directos desde Barranquilla
+            {
+                "origin": "BAQ",
+                "destination": "CTG",
+                "departure_time": "11:00",
+                "arrival_time": "12:00",
+                "days_of_week": "Thursday",
                 "airplane": airplane_instances[1],
             },
         ]

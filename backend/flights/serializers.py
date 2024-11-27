@@ -57,6 +57,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "booking_date",
         ]
 
+
 class ReservationSerializer:
     flight = FlightSerializer()
     selected_seat = SeatSerializer()
