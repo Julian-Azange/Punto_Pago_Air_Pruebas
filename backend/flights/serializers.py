@@ -38,7 +38,7 @@ class PassengerSerializer(serializers.ModelSerializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     flight = FlightSerializer()
-    seat = SeatSerializer()
+    seats = SeatSerializer(many=True)
     passengers = PassengerSerializer(many=True)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2)
 
@@ -47,12 +47,13 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "flight",
-            "seat",
             "passengers",
+            "seats",
+            "booking_date",
             "luggage_hand",
             "luggage_hold",
             "extra_luggage",
+            "meal_included",
             "extra_meal",
             "total_price",
-            "booking_date",
         ]

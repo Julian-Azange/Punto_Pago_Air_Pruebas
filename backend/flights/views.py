@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 """
 class AirportListView(APIView):
+
     def get(self, request):
         airports = Airport.objects.all()
         serializer = AirportSerializer(airports, many=True)
@@ -75,6 +76,7 @@ class FlightSearchView(APIView):
                 "routes_with_stops": routes_with_stops,
             },
             status=status.HTTP_200_OK)
+
 
 
     def find_routes_with_stops(self, origin, destination, day_of_week, travel_date):
@@ -219,7 +221,7 @@ class BookingView(APIView):
 
             if not flight_id or not passenger_info:
                 return Response(
-                    {"error": "Faltan datos requeridos."},
+                    {"error": "Faltan el id del vuelo o información del/los pasajeros."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -239,16 +241,7 @@ class BookingView(APIView):
                 )
 
             # Crear los pasajeros
-            passengers = []
-            for passenger in passenger_info:
-                p = Passenger.objects.create(
-                    first_name=passenger["first_name"],
-                    last_name=passenger["last_name"],
-                    email=passenger["email"],
-                    date_of_birth=passenger["date_of_birth"],
-                    is_infant=passenger.get("is_infant", False),
-                )
-                passengers.append(p)
+            passengers = self.save_passengers_list(passenger_info)
 
             # Crear la reserva
             booking = Booking.objects.create(
@@ -258,6 +251,7 @@ class BookingView(APIView):
                 extra_luggage=extra_luggage,
                 extra_meal=extra_meal,
             )
+
             booking.passengers.set(passengers)
             booking.seats.set(available_seats)
 
@@ -287,6 +281,19 @@ class BookingView(APIView):
                 {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        
+    def save_passengers_list(passenger_info):
+        passengers = [
+            Passenger.objects.create(
+                first_name=passenger["first_name"],
+                last_name=passenger["last_name"],
+                email=passenger["email"],
+                date_of_birth=passenger["date_of_birth"],
+                is_infant=passenger.get("is_infant", False),
+            )
+            for passenger in passenger_info
+        ]
+        return passengers
 
 
 class BookingDetailView(RetrieveAPIView):
@@ -299,12 +306,11 @@ class BookingDetailView(RetrieveAPIView):
         if not email:
             return Response({"error":"El Correo es requerido para consultar una reserva."}, status=status.HTTP_400_BAD_REQUEST)
         
-        booking = Booking.objects.filter(id=pk).prefetch_related(
-            Prefetch('passengers', queryset=Passenger.objects.filter(email=email))
-            )
+        booking = Booking.objects.filter(id=pk, passengers__email=email)
         if not booking:
             return Response({"error":"El vuelo no fue encontrado."}, status=status.HTTP_404_NOT_FOUND)
         
+
         serializer = BookingSerializer(booking, many=True)
 
         return Response(serializer.data, status=status.HTTP_200_OK) 
