@@ -57,11 +57,12 @@ class Flight(models.Model):
     airplane = models.ForeignKey(
         Airplane, related_name="airplanes", on_delete=models.CASCADE
     )
-    price = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)  # Precio en COP
+    price = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0.00
+    )  # Precio en COP
 
     def __str__(self):
         return f"Flight from {self.origin} to {self.destination}"
-
 
 
 class Passenger(models.Model):
@@ -79,16 +80,33 @@ class Booking(models.Model):
     flight = models.ForeignKey(Flight, on_delete=models.CASCADE)
     passengers = models.ManyToManyField(Passenger)
     seats = models.ManyToManyField(Seat)
+    seat_class = models.CharField(
+        max_length=20,
+        choices=[
+            ("first_class", "Primera Clase"),
+            ("business_class", "Clase Ejecutiva"),
+            ("economy_class", "Clase Económica"),
+        ],
+    )
     booking_date = models.DateTimeField(auto_now_add=True)
     luggage_hand = models.BooleanField(default=False)  # Equipaje de mano (10kg)
     luggage_hold = models.BooleanField(default=False)  # Equipaje de bodega (23kg)
-    extra_luggage = models.PositiveIntegerField(default=0)  # Cantidad de equipaje adicional
-    meal_included = models.BooleanField(default=False)  # Si la comida está incluida (solo primera clase)
-    extra_meal = models.PositiveIntegerField(default=0)  # Cantidad de comidas adicionales
+    extra_luggage = models.PositiveIntegerField(
+        default=0
+    )  # Cantidad de equipaje adicional
+    meal_included = models.BooleanField(
+        default=False
+    )  # Si la comida está incluida (solo primera clase)
+    extra_meal = models.PositiveIntegerField(
+        default=0
+    )  # Cantidad de comidas adicionales
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
-    def calculate_price(self): # TODO: Verificar cobro de precio
-        base_price = Decimal("100.00")  # Este sería el precio base del vuelo
+    def __str__(self):
+        return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
+
+    def calculate_price(self):
+        base_price = self.flight.price
         seat_price_multiplier = {
             "first_class": Decimal("1.07"),
             "business_class": Decimal("1.05"),
@@ -96,43 +114,37 @@ class Booking(models.Model):
         }
 
         # Ajuste por clase de asiento
-        seat_class_multiplier = Decimal("1.00")
-        for seat in self.seats.all():
-            seat_class_multiplier = seat_price_multiplier.get(
-                seat.seat_class, Decimal("1.0")
-            )
+        seat_class_multiplier = seat_price_multiplier.get(
+            self.seat_class, Decimal("1.0")
+        )
 
-        # Precio por cantidad de pasajeros
-        passenger_count = Decimal(self.passengers.count())
-        price = base_price * passenger_count * seat_class_multiplier
-
-        # Ajuste por pasajeros menores de 2 años (gratis)
-        infant_count = self.passengers.filter(is_infant=True).count()
-        if infant_count > 0:
-            price -= base_price * Decimal(infant_count)
+        total_price = Decimal("0.00")
+        for passenger in self.passengers.all():
+            if passenger.is_infant:
+                # Precio para infante (gratis)
+                continue
+            else:
+                # Precio para adulto o niño mayor a 2 años
+                total_price += base_price * seat_class_multiplier
 
         # Ajuste por equipaje
         if self.luggage_hold:
-            price += Decimal("50.00")  # Costo por equipaje de bodega
+            total_price += Decimal("50.00")  # Costo por equipaje de bodega
         if self.extra_luggage > 0:
-            price += (
+            total_price += (
                 Decimal(self.extra_luggage) * Decimal("3.00") / Decimal("100.00")
             )  # 3% por cada equipaje adicional
 
         # Ajuste por comida adicional
         if self.extra_meal > 0:
-            price += (
+            total_price += (
                 Decimal(self.extra_meal) * Decimal("1.00") / Decimal("100.00")
             )  # 1% por cada comida adicional
 
         # Guardar el precio total
-        self.total_price = price
+        self.total_price = total_price
         self.save()
         return self.total_price
-    
-    def __str__(self):
-        return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
-
 
 
 class BookingPaymentCode(models.Model):
@@ -140,7 +152,8 @@ class BookingPaymentCode(models.Model):
     booking = models.OneToOneField(Booking, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __strt__(self):
+    def __str__(self):
         return f"Código de pago para el vuelo {self.booking.id}: {self.payment_code}"
+
 
 # TODO: añadir tabla de transaccion con cod -> verificar transaccion y pago
