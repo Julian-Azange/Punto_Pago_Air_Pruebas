@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
 import traceback
+from django.db.models import Prefetch
+
 from .models import Airport, Flight, Seat, Passenger, Booking, Reservation, ReservationPaymentCode
 from .serializers import (
     FlightSerializer,
@@ -297,6 +299,22 @@ class BookingDetailView(RetrieveAPIView):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
 
+    def get(self, request, pk):
+        email = request.GET.get('email')
+        
+        if not email:
+            return Response({"error":"El Correo es requerido para consultar una reserva."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        booking = Booking.objects.filter(id=pk).prefetch_related(
+            Prefetch('passengers', queryset=Passenger.objects.filter(email=email))
+            )
+        if not booking:
+            return Response({"error":"El vuelo no fue encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = BookingSerializer(booking, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK) 
+
     def get_object(self):
         try:
             return super().get_object()
@@ -304,6 +322,7 @@ class BookingDetailView(RetrieveAPIView):
             raise NotFound(
                 detail="La reserva solicitada no existe o ha sido eliminada."
             )
+        
 
 
 class SeatListView(APIView):
