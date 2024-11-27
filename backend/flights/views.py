@@ -15,6 +15,7 @@ from .serializers import (
     BookingSerializer,
     SeatSerializer,
 )
+from math import fsum
 from collections import deque
 import logging
 from django.shortcuts import get_object_or_404
@@ -85,6 +86,7 @@ class FlightSearchView(APIView):
 
             if current_airport == destination and len(path) > 2:
                 hours, minutes = divmod(total_duration, 60)
+                precio_total = fsum(flight["price"] for flight in flight_details)
                 routes.append(
                     {
                         "id": flight_details[0].get("id"),
@@ -103,7 +105,8 @@ class FlightSearchView(APIView):
                         "fecha_inicio": flight_details[0]["departure_time"],
                         "fecha_final": flight_details[-1]["arrival_time"],
                         "duracion": f"{int(hours)} horas, {int(minutes)} minutos",
-                        "precio": f"${sum(flight["price"] for flight in flight_details):,.2f} COP",
+                    
+                        "precio": f"{precio_total} COP",
                         "vuelos": flight_details,
                     }
                 )
@@ -265,6 +268,12 @@ class BookingView(APIView):
             # Calcular el precio total
             booking.total_price = booking.calculate_price()
             booking.save()
+
+            bookingPayment = BookingPaymentCode.objects.create(
+                booking=booking
+            )
+
+            # Enviar correo con el código de pago
 
             # Serializar la respuesta
             serializer = BookingSerializer(booking)

@@ -32,7 +32,7 @@ class Seat(models.Model):
             ("first_class", "Primera Clase"),
             ("business_class", "Clase Ejecutiva"),
             ("economy_class", "Clase Económica"),
-        ],
+        ]
     )
     is_reserved = models.BooleanField(default=False)
 
@@ -101,6 +101,7 @@ class Booking(models.Model):
         default=0
     )  # Cantidad de comidas adicionales
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    payment_status= models.CharField(max_length=15, default="pendiente")
 
     def __str__(self):
         return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
