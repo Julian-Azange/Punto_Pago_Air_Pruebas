@@ -8,13 +8,12 @@ from datetime import datetime, timedelta
 import traceback
 from django.db.models import Prefetch
 
-from .models import Airport, Flight, Seat, Passenger, Booking, Reservation, ReservationPaymentCode
+from .models import Airport, Flight, Seat, Passenger, Booking, Booking, BookingPaymentCode
 from .serializers import (
     FlightSerializer,
     AirportSerializer,
     BookingSerializer,
-    SeatSerializer,
-    ReservationSerializer
+    SeatSerializer
 )
 from collections import deque
 import logging
@@ -43,25 +42,19 @@ class AirportListView(APIView):
 
 
 class FlightSearchView(APIView):
+
     def get(self, request):
         origin_code = request.query_params.get("origin")
         destination_code = request.query_params.get("destination")
         date_str = request.query_params.get("date")
 
-        if not origin_code or not destination_code or not date_str:
-            return Response(
-                {"error": "Origen, destino y fecha son requeridos."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if not origin_code or not destination_code:
+            return Response({"error": "Origen, y destino son requeridos."},status=status.HTTP_400_BAD_REQUEST)
+        
+        if not date_str:
+            return Response({"error": "Fecha es requerida."},status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            date = datetime.strptime(date_str, "%Y-%m-%d")
-            day_of_week = date.strftime("%A")
-        except ValueError:
-            return Response(
-                {"error": "Fecha en formato inválido. Use YYYY-MM-DD."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        day_of_week= self.format_date(date_str)
 
         # Buscar vuelos directos
         direct_flights = Flight.objects.filter(
@@ -70,27 +63,19 @@ class FlightSearchView(APIView):
             days_of_week__icontains=day_of_week,
         )
 
-        direct_flight_data = []
-        for flight in direct_flights:
-            duration = self.calculate_duration(flight)
-            hours, minutes = divmod(duration, 60)
-            flight_data = FlightSerializer(flight).data
-            flight_data["duration"] = f"{int(hours)} horas, {int(minutes)} minutos"
-            flight_data["price"] = f"${flight.price:,.3f} COP"
-            direct_flight_data.append(flight_data)
+        direct_flight_data = self.append_direct_flight_data(direct_flights)
 
         # Buscar rutas con escalas
         routes_with_stops = self.find_routes_with_stops(
-            origin_code, destination_code, day_of_week, date
+            origin_code, destination_code, day_of_week
         )
 
-        return Response(
-            {
+        return Response({
                 "direct_flights": direct_flight_data,
                 "routes_with_stops": routes_with_stops,
             },
-            status=status.HTTP_200_OK,
-        )
+            status=status.HTTP_200_OK)
+
 
     def find_routes_with_stops(self, origin, destination, day_of_week, travel_date):
         routes = []
@@ -170,6 +155,18 @@ class FlightSearchView(APIView):
 
         return routes
 
+ 
+    def format_date(date_str:str)->str:
+        try:
+            date = datetime.strptime(date_str, "%Y-%m-%d")
+            return date.strftime("%A")
+        except ValueError:
+            return Response(
+                {"error": "Fecha en formato inválido. Use YYYY-MM-DD."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+    
     def calculate_duration(self, flight):
         fmt = "%H:%M"
         departure_time = datetime.strptime(flight.departure_time.strftime(fmt), fmt)
@@ -178,6 +175,19 @@ class FlightSearchView(APIView):
         if duration < 0:
             duration += 24 * 60
         return duration
+    
+
+    def append_direct_flight_data(self, direct_flights):
+        direct_flight_data = []
+        for flight in direct_flights:
+            duration = self.calculate_duration(flight)
+            hours, minutes = divmod(duration, 60)
+            flight_data = FlightSerializer(flight).data
+            flight_data["duration"] = f"{int(hours)} horas, {int(minutes)} minutos"
+            flight_data["price"] = f"${flight.price:,.3f} COP"
+            direct_flight_data.append(flight_data)
+        return direct_flight_data
+
 
     def get_next_day(self, current_day):
         days_of_week = [
@@ -192,6 +202,7 @@ class FlightSearchView(APIView):
         current_index = days_of_week.index(current_day)
         next_index = (current_index + 1) % len(days_of_week)
         return days_of_week[next_index]
+
 
 
 class BookingView(APIView):
@@ -336,13 +347,28 @@ class SeatListView(APIView):
         serializer = SeatSerializer(seats, many=True)
         return Response(serializer.data)
 
-class ReservationPaymentDetailView(APIView):
+
+
+class BookingPaymentDetailView(APIView):
+
+    def get_by_booking_id(self, request, booking_id)->Response:
+        booking_exists = Booking.objects.exists(booking_id)
+        if not booking_exists:
+            return Response({"error":"Reservación con id dado no existe"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        bookingPaymentCode = BookingPaymentCode.objects.filter(
+            booking_id=booking_id
+        ).first
+
+        return Response({"success":f"Código para booking consultado {bookingPaymentCode.payment_code}"},
+                        status=status.HTTP_200_OK)
+    
 
     # Verifica que un coódigo de pago sea el correcto, simulando un pago real -> planteado para implementar con api de algun email y verificar con base de datos.
     # TODO: añadir arg datos de pago, 
-    def payReservation(self, request, reservation_id)->Response:
-        reservation_exists = Reservation.objects.exists(reservation_id)
-        if not reservation_exists:
+    def payBooking(self, request, booking_id)->Response:
+        booking_exists = Booking.objects.exists(booking_id)
+        if not booking_exists:
             return Response({"error":"Reservación con id dado no existe"}, status=status.HTTP_400_BAD_REQUEST)
 
         data = request.data
@@ -366,14 +392,3 @@ class ReservationPaymentDetailView(APIView):
         else:
             return False
         
-    def get_by_reservation_id(self, request, reservation_id)->Response:
-        reservation_exists = Reservation.objects.exists(reservation_id)
-        if not reservation_exists:
-            return Response({"error":"Reservación con id dado no existe"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        reservationPmntCode = ReservationPaymentCode.objects.filter(
-            reservation_id=reservation_id
-        ).first
-
-        return Response({"success":f"Código para booking consultado {reservationPmntCode.payment_code}"},
-                        status=status.HTTP_200_OK)

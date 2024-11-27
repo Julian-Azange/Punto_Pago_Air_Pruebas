@@ -19,4 +19,3 @@ urlpatterns = [
         name="booking-detail",
     ),
 ]
-# path("api/reservation/<int:reservation:id>/payment-code", views.ReservationPaymentDetailView.as_view(), name="reservation")

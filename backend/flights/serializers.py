@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Airport, Flight, Seat, Passenger, Booking, Reservation
+from .models import Airport, Flight, Seat, Passenger, Booking
 
 
 class AirportSerializer(serializers.ModelSerializer):
@@ -55,25 +55,4 @@ class BookingSerializer(serializers.ModelSerializer):
             "extra_meal",
             "total_price",
             "booking_date",
-        ]
-
-
-class ReservationSerializer:
-    flight = FlightSerializer()
-    selected_seat = SeatSerializer()
-    total_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-
-    class Meta:
-        model = Reservation
-        fields = [
-            "id",
-            "flight",
-            "passengers",
-            "luggage_hand",
-            "luggage_baggage",
-            "infant",
-            "selected_seat"
-            "customer_name",
-            "customer_email",
-            "total_price"
         ]
