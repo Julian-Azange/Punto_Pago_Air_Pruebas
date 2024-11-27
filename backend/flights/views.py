@@ -282,7 +282,7 @@ class BookingView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         
-    def save_passengers_list(passenger_info):
+    def save_passengers_list(self, passenger_info):
         passengers = [
             Passenger.objects.create(
                 first_name=passenger["first_name"],
