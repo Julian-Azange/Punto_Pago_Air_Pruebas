@@ -78,7 +78,7 @@ class Passenger(models.Model):
 class Booking(models.Model):
     flight = models.ForeignKey(Flight, on_delete=models.CASCADE)
     passengers = models.ManyToManyField(Passenger)
-    seat = models.ForeignKey(Seat, on_delete=models.CASCADE)
+    seats = models.ManyToManyField(Seat)
     booking_date = models.DateTimeField(auto_now_add=True)
     luggage_hand = models.BooleanField(default=False)  # Equipaje de mano (10kg)
     luggage_hold = models.BooleanField(default=False)  # Equipaje de bodega (23kg)
@@ -96,13 +96,20 @@ class Booking(models.Model):
         }
 
         # Ajuste por clase de asiento
-        seat_class_multiplier = seat_price_multiplier.get(
-            self.seat.seat_class, Decimal("1.0")
-        )
+        seat_class_multiplier = Decimal("1.00")
+        for seat in self.seats.all():
+            seat_class_multiplier = seat_price_multiplier.get(
+                seat.seat_class, Decimal("1.0")
+            )
 
         # Precio por cantidad de pasajeros
         passenger_count = Decimal(self.passengers.count())
         price = base_price * passenger_count * seat_class_multiplier
+
+        # Ajuste por pasajeros menores de 2 años (gratis)
+        infant_count = self.passengers.filter(is_infant=True).count()
+        if infant_count > 0:
+            price -= base_price * Decimal(infant_count)
 
         # Ajuste por equipaje
         if self.luggage_hold:
