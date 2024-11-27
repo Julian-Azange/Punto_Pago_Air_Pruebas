@@ -18,4 +18,14 @@ urlpatterns = [
         views.BookingDetailView.as_view(),
         name="booking-detail",
     ),
+    path(
+        "api/bookings/payments/<int:booking_id>",
+        views.BookingPaymentDetailView.as_view(),
+        name="booking-payment-detail",
+    ),
+    path(
+        "api/bookings/payments/<int:booking_id>/pay",
+        views.BookingPaymentPayView.as_view(),
+        name="booking-payment-pay",
+    )
 ]

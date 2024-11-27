@@ -354,9 +354,10 @@ class SeatListView(APIView):
 
 class BookingPaymentDetailView(APIView):
 
-    def get_by_booking_id(self, request, booking_id) -> Response:
-        booking_exists = Booking.objects.exists(booking_id)
-        if not booking_exists:
+    def get(self, request, booking_id) -> Response:
+        booking = Booking.objects.filter(id=booking_id)
+ 
+        if not booking:
             return Response(
                 {"error": "Reservación con id dado no existe"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -364,52 +365,43 @@ class BookingPaymentDetailView(APIView):
 
         bookingPaymentCode = BookingPaymentCode.objects.filter(
             booking_id=booking_id
-        ).first
+        ).first()
 
-        return Response(
-            {
-                "success": f"Código para booking consultado {bookingPaymentCode.payment_code}"
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response({"code": {bookingPaymentCode.payment_code}}, status=status.HTTP_200_OK)
 
+class BookingPaymentPayView(APIView):
     # Verifica que un coódigo de pago sea el correcto, simulando un pago real -> planteado para implementar con api de algun email y verificar con base de datos.
     # TODO: añadir arg datos de pago,
-    def payBooking(self, request, booking_id) -> Response:
-        booking_exists = Booking.objects.exists(booking_id)
+    def get(self, request, booking_id) -> Response:
+
+        payment_code = request.GET.get("code")
+
+        if not payment_code:
+            return Response(
+                {"error": "El código de pago es requerido para pagar la reserva."},
+                status=status.HTTP_400_BAD_REQUEST)
+        
+        booking_exists = Booking.objects.filter(id=booking_id)
+        
         if not booking_exists:
             return Response(
                 {"error": "Reservación con id dado no existe"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+        booking_payment_code = BookingPaymentCode.objects.filter(
+            payment_code=payment_code).prefetch_related(
+                                    Prefetch
+                                        ('booking',
+                                        queryset = Booking.objects.filter(
+                                        id=booking_id))
+                                    )
+        
+        if not booking_payment_code:
+            return Response({"error":"El código de pago no corresponde a la reseva."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        data = request.data
-        try:
-            payment_code = data.get("payment_code")
-            if not payment_code:
-                return Response(
-                    {"error": "Falta el código de pago."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
-            if not self.is_valid_payment_code(payment_code):
-                return Response(
-                    {"error": "Código de pago incorrecto inválido."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            return Response(
-                {"success": "Vuelo pagado correctamente."}, status=status.HTTP_200_OK
-            )
-        # En este punto debería realizarse el pago real.
-        except:
-            Response(
-                {"error": "Ocurrió un error al pagar la reserva"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    def is_valid_payment_code(payment_code: int) -> bool:
-        if payment_code > 5:
-            return True
-        else:
-            return False
+        return Response(
+                {"success": "Vuelo pagado correctamente."}, 
+                status=status.HTTP_200_OK)

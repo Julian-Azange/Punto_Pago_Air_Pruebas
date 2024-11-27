@@ -150,7 +150,7 @@ class Booking(models.Model):
 
 class BookingPaymentCode(models.Model):
     payment_code = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    booking = models.OneToOneField(Booking, on_delete=models.CASCADE)
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
