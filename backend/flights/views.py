@@ -414,6 +414,11 @@ class BookingPaymentPayView(APIView):
             return Response({"error":"El código de pago y/o email del pasajero no corresponde a la reseva dada."},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # Updates the status of the bokking to 'pagado'
+        Booking.objects.filter(id=booking_id).prefetch_related(
+                Prefetch('passengers',queryset=Passenger.objects.filter(email=email))
+            ).update(payment_status="pagado")
+        
 
         return Response(
                 {"success": "Vuelo pagado correctamente."}, 
