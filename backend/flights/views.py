@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import traceback
 from django.db.models import Prefetch
 
-from .models import Airport, Flight, Seat, Passenger, Booking, BookingPaymentCode
+from .models import Airport, BookingDetail, BookingScales, Flight, FlightSeatInstance, Seat, Passenger, Booking, BookingPaymentCode
 from .serializers import (
     FlightSerializer,
     AirportSerializer,
@@ -422,3 +422,126 @@ class BookingPaymentPayView(APIView):
         return Response(
                 {"success": "Vuelo pagado correctamente."}, 
                 status=status.HTTP_200_OK)
+        
+        
+
+class BookingScalesView(APIView):
+    def post(self, request):
+        data = request.data
+
+        try:
+            
+            passenger_info = data.get("passengers")
+        
+            luggage_hand = data.get("luggage_hand", False)
+            luggage_hold = data.get("luggage_hold", False)
+            extra_luggage = data.get("extra_luggage", 0)
+            extra_meal = data.get("extra_meal", 0)
+            departure_date = data.get("departure_date")
+
+
+
+            if not passenger_info or not departure_date:
+                return Response(
+                    {"error": "Faltan datos requeridos."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            list_seat_flights = [d["flight_ids"] for d in passenger_info]
+            
+            #Validar, que tengan las mismas cantidad de asientos  y vuelos, que existan asientos disponibles, si no trae asientos asignarle automaticamente
+            #Fala la funcion, datos entrada list_seat_flights =  [{'1': 'E1', '2': 'E2'}, {'154': 'E1', '254': 'E2'}]
+            #{'id del Vuelo': 'Asiento seleecionado', '2': 'E2'}
+
+            
+            # print(list_seat_flights)
+
+            # return Response({"ok":"hola"}, status=status.HTTP_201_CREATED)
+
+            # Validar que la cantidad de vuelos y asientos proporcionados coincidan
+ 
+            total_price = Decimal(
+                "0.00"
+            )  # Inicializar el precio total para toda la reserva
+
+
+            # Reservar cada vuelo de la ruta
+            # Crear la reserva para el vuelo actual
+            
+            booking_passenger = passenger_info[0]
+            newpassengerBooking = Passenger.objects.create(
+                    first_name=booking_passenger["first_name"],
+                    last_name=booking_passenger["last_name"],
+                    email=booking_passenger["email"],
+                    date_of_birth=booking_passenger["date_of_birth"],
+                    is_infant=False,
+                )
+
+            newBooking = BookingScales.objects.create(
+                passenger =newpassengerBooking,
+                luggage_hand=luggage_hand,
+                luggage_hold=luggage_hold,
+                extra_luggage=extra_luggage,
+                extra_meal=extra_meal,
+            )
+            
+
+
+            # Crear los pasajeros (esto es común para todos los vuelos de la ruta)
+            for passenger in passenger_info:
+
+                #Crear pasajero - Valdiar si ya existe ese pasajero con el email
+                p = Passenger.objects.create(
+                    first_name=passenger["first_name"],
+                    last_name=passenger["last_name"],
+                    email=passenger["email"],
+                    date_of_birth=passenger["date_of_birth"],
+                    is_infant=passenger.get("is_infant", False),
+                )
+
+
+                # for flight, seat in passenger.get("flight_ids").items():
+                for index, (flight, seat) in enumerate(passenger.get("flight_ids").items(), start=0):
+
+                    flight_instance = Flight.objects.get(id=int(flight))
+                    seat_instance = Seat.objects.get(id=int(seat))     
+
+                    #Validar si los asientos estan disponibles, esto es en newFlightSeat, con la fecha y vuelo y asiento
+                    # o si no crear
+
+                    newFlightSeat = FlightSeatInstance.objects.create(
+                        seat=seat_instance,
+                        flight=flight_instance,
+                        date=departure_date
+                    )
+
+                    is_stopover = False
+
+                    if len(passenger.get("flight_ids").keys())>1 and index > 0:
+                        is_stopover = True
+                        stopover_order = index
+
+                    newBookingDetail = BookingDetail.objects.create(
+                        booking = newBooking,
+                        flightSeat = newFlightSeat,
+                        passenger =p,
+                        is_stopover = is_stopover,
+                        stopover_order = index
+                    )
+
+            
+            serializer = BookingCreateSerializer(newBooking)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Flight.DoesNotExist:
+            return Response(
+                {"error": "Vuelo no encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            logger.error(f"Error al crear la reserva: {str(e)}")
+            logger.error(traceback.format_exc())
+            return Response(
+                {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

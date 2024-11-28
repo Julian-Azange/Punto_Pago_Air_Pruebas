@@ -61,3 +61,23 @@ class BookingSerializer(serializers.ModelSerializer):
             "payment_status",
             "payment_code"
         ]
+
+
+
+class BookingScalesCreateSerializer(serializers.ModelSerializer):
+    passenger_email = serializers.EmailField(source='passenger.email', read_only=True) 
+
+    class Meta:
+        model = Booking
+        fields = [
+            'id',
+            'passenger_email',
+            'passenger',
+            'booking_date',
+            'luggage_hand',
+            'luggage_hold',
+            'extra_luggage',
+            'meal_included',
+            'extra_meal',
+            'total_price',
+        ]
