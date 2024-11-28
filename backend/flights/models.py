@@ -1,6 +1,7 @@
 from django.db import models
 from decimal import Decimal
 import uuid
+from enum import Enum
 
 
 class Airport(models.Model):
@@ -101,12 +102,18 @@ class Booking(models.Model):
         default=0
     )  # Cantidad de comidas adicionales
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    payment_status= models.CharField(max_length=15, default="pendiente")
+
+    payment_status= models.CharField(max_length=15)
+    payment_code= models.CharField(max_length=15)
     # Propiedad de código de pago, declarada así para no ser persistente puesto que es buscada.
+    
     @property
     def payment_code(self):
         return BookingPaymentCode.objects.filter(booking__id=self.id).first().payment_code
 
+    @property
+    def payment_status(self):
+        return BookingPaymentCode.objects.filter(booking__id=self.id).first().payment_status
 
     def __str__(self):
         return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
@@ -154,12 +161,26 @@ class Booking(models.Model):
 
 # TODO: Chek if relationship is Foreign key or OneToOne
 class BookingPaymentCode(models.Model):
+    # Enum Definition
+    class PaymentStatus(models.TextChoices):
+        PENDING = 'PENDIENTE'
+        PAID = 'PAGADO'  
+    # Attributes
     payment_code = models.UUIDField(primary_key=True, default=uuid.uuid4)
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+    payment_status = models.CharField(max_length=10,
+                                      choices=PaymentStatus.choices,
+                                      default=PaymentStatus.PENDING.value)
+
+    def get_payment_status(self) -> PaymentStatus:
+        return self.PaymentStatus(self.payment_status)
+
 
     def __str__(self):
         return f"Código de pago para el vuelo {self.booking.id}: {self.payment_code}"
+    
+
 
 
 # TODO: añadir tabla de transaccion con cod -> verificar transaccion y pago

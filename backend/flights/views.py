@@ -415,11 +415,10 @@ class BookingPaymentPayView(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         # Updates the status of the bokking to 'pagado'
-        Booking.objects.filter(id=booking_id).prefetch_related(
-                Prefetch('passengers',queryset=Passenger.objects.filter(email=email))
-            ).update(payment_status="pagado")
+        BookingPaymentCode.objects.filter(booking__id=booking_id, booking__passengers__email=email).update(
+                payment_status = BookingPaymentCode.PaymentStatus.PAID.value
+            )
         
-
         return Response(
                 {"success": "Vuelo pagado correctamente."}, 
                 status=status.HTTP_200_OK)
