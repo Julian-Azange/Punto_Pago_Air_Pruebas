@@ -20,7 +20,7 @@ from collections import deque
 import logging
 from django.shortcuts import get_object_or_404
 from rest_framework.generics import ListAPIView
-
+from .serializers import BookingScalesCreateSerializer
 logger = logging.getLogger(__name__)
 
 
@@ -530,7 +530,7 @@ class BookingScalesView(APIView):
                     )
 
             
-            serializer = BookingCreateSerializer(newBooking)
+            serializer = BookingScalesCreateSerializer(newBooking)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except Flight.DoesNotExist:

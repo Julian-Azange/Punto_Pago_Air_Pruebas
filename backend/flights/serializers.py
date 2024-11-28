@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Airport, Flight, Seat, Passenger, Booking
+from .models import Airport, Flight, Seat, Passenger, Booking, BookingScales
 
 
 class AirportSerializer(serializers.ModelSerializer):
@@ -68,7 +68,7 @@ class BookingScalesCreateSerializer(serializers.ModelSerializer):
     passenger_email = serializers.EmailField(source='passenger.email', read_only=True) 
 
     class Meta:
-        model = Booking
+        model = BookingScales
         fields = [
             'id',
             'passenger_email',
