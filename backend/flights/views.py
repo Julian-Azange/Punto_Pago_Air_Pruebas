@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
 import traceback
+from .email_helper import EmailHelper
 from django.db.models import Prefetch
 
 from .models import Airport, BookingDetail, BookingScales, Flight, FlightSeatInstance, Seat, Passenger, Booking, BookingPaymentCode
@@ -275,6 +276,8 @@ class BookingView(APIView):
 
             # Enviar correo con el código de pago 
 
+            self.send_email_payment_code(str(bookingPayment.payment_code))
+
             # Serializar la respuesta
             serializer = BookingSerializer(booking)
             
@@ -292,6 +295,14 @@ class BookingView(APIView):
                 {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        
+
+    def send_email_payment_code(self, payment_code):
+        if not payment_code:
+            return Response({"error":"Un error inesperado ocurrió, lo sentimos."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            EmailHelper.send_payment_email(payment_code)
+
 
     def save_passengers_list(self, passenger_info):
         passengers = [
@@ -305,6 +316,7 @@ class BookingView(APIView):
             for passenger in passenger_info
         ]
         return passengers
+
 
 
 class BookingDetailView(RetrieveAPIView):
