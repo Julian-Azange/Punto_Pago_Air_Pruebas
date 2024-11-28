@@ -273,11 +273,11 @@ class BookingView(APIView):
                 booking=booking
             )
 
-            # Enviar correo con el código de pago
+            # Enviar correo con el código de pago 
 
             # Serializar la respuesta
             serializer = BookingSerializer(booking)
-
+            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except Flight.DoesNotExist:
@@ -355,19 +355,27 @@ class SeatListView(APIView):
 class BookingPaymentDetailView(APIView):
 
     def get(self, request, booking_id) -> Response:
-        booking = Booking.objects.filter(id=booking_id)
+        email = request.GET.get("email")
+
+        if not email:
+            return Response({"error":"Email es requerido para consultar código de pago de una reserva."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        
+        booking = Booking.objects.filter(id=booking_id).prefetch_related(
+            Prefetch('passengers', queryset=Passenger.objects.filter(email=email))#  passengers__email=email
+        )
  
         if not booking:
             return Response(
-                {"error": "Reservación con id dado no existe"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+                {"error": "Reservación con id y/o email dado no existe"},
+                status=status.HTTP_400_BAD_REQUEST)
+        # TODO: check if its "first()" according to relationship
         bookingPaymentCode = BookingPaymentCode.objects.filter(
             booking_id=booking_id
         ).first()
 
-        return Response({"code": {bookingPaymentCode.payment_code}}, status=status.HTTP_200_OK)
+        return Response({"code": {bookingPaymentCode.payment_code}}, 
+                        status=status.HTTP_200_OK)
 
 class BookingPaymentPayView(APIView):
     # Verifica que un coódigo de pago sea el correcto, simulando un pago real -> planteado para implementar con api de algun email y verificar con base de datos.
@@ -381,24 +389,29 @@ class BookingPaymentPayView(APIView):
                 {"error": "El código de pago es requerido para pagar la reserva."},
                 status=status.HTTP_400_BAD_REQUEST)
         
-        booking_exists = Booking.objects.filter(id=booking_id)
+        email = request.GET.get("email")
+
+        if not email:
+            return Response({"error":"Email es requerido para pagar la reserva."},
+                            status=status.HTTP_400_BAD_REQUEST)
         
-        if not booking_exists:
-            return Response(
-                {"error": "Reservación con id dado no existe"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        booking = Booking.objects.filter(id=booking_id).prefetch_related(
+            Prefetch('passengers', queryset=Passenger.objects.filter(email=email))
+        )
         
-        booking_payment_code = BookingPaymentCode.objects.filter(
-            payment_code=payment_code).prefetch_related(
-                                    Prefetch
-                                        ('booking',
-                                        queryset = Booking.objects.filter(
-                                        id=booking_id))
+        if not booking:
+            return Response({"error": "Reservación con id y/o email dado no existe"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        
+        # Checks if a payment code corresponds to a booking by its id and by the passenger email associated to that booking
+        booking_payment_code = BookingPaymentCode.objects.filter(payment_code=payment_code).prefetch_related(
+                                    Prefetch('booking', queryset = Booking.objects.filter(id=booking_id).prefetch_related
+                                                (Prefetch('passengers',queryset=Passenger.objects.filter(email=email)))
+                                            )
                                     )
         
         if not booking_payment_code:
-            return Response({"error":"El código de pago no corresponde a la reseva."},
+            return Response({"error":"El código de pago y/o email del pasajero no corresponde a la reseva dada."},
                             status=status.HTTP_400_BAD_REQUEST)
 
 

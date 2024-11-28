@@ -102,6 +102,11 @@ class Booking(models.Model):
     )  # Cantidad de comidas adicionales
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     payment_status= models.CharField(max_length=15, default="pendiente")
+    # Propiedad de código de pago, declarada así para no ser persistente puesto que es buscada.
+    @property
+    def payment_code(self):
+        return BookingPaymentCode.objects.filter(booking__id=self.id).first().payment_code
+
 
     def __str__(self):
         return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
@@ -147,7 +152,7 @@ class Booking(models.Model):
         self.save()
         return self.total_price
 
-
+# TODO: Chek if relationship is Foreign key or OneToOne
 class BookingPaymentCode(models.Model):
     payment_code = models.UUIDField(primary_key=True, default=uuid.uuid4)
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE)

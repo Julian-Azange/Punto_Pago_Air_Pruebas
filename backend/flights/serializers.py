@@ -41,6 +41,7 @@ class BookingSerializer(serializers.ModelSerializer):
     seats = SeatSerializer(many=True)
     passengers = PassengerSerializer(many=True)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    payment_code = serializers.ReadOnlyField()
 
     class Meta:
         model = Booking
@@ -56,4 +57,6 @@ class BookingSerializer(serializers.ModelSerializer):
             "meal_included",
             "extra_meal",
             "total_price",
+            "payment_status",
+            "payment_code"
         ]
