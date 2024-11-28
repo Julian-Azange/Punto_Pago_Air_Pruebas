@@ -27,5 +27,8 @@ urlpatterns = [
         "api/bookings/payments/<int:booking_id>/pay",
         views.BookingPaymentPayView.as_view(),
         name="booking-payment-pay",
-    )
+    ),
+    
+    path("api/bookings_scales/", views.BookingScalesView.as_view(), name="booking_scales"),
+    
 ]
