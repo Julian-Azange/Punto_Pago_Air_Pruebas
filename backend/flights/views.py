@@ -11,7 +11,7 @@ from .email_helper import EmailHelper
 from django.db.models import Prefetch
 from django.db.models import Count
 
-from .models import Airplane, Airport, BookingDetail, BookingScales, Flight, FlightSeatInstance, Seat, Passenger, Booking, BookingPaymentCode
+from .models import Airplane, Airport, BookingDetail, BookingScalePaymentCode, BookingScales, Flight, FlightSeatInstance, Seat, Passenger, Booking, BookingPaymentCode
 from .serializers import (
     FlightSerializer,
     AirportSerializer,
@@ -278,7 +278,7 @@ class BookingView(APIView):
 
             # Enviar correo con el código de pago 
 
-            self.send_email_payment_code(str(bookingPayment.payment_code))
+            #self.send_email_payment_code(str(bookingPayment.payment_code))
 
             # Serializar la respuesta
             serializer = BookingSerializer(booking)
@@ -422,7 +422,7 @@ class BookingPaymentPayView(APIView):
                                     Prefetch('booking', queryset = Booking.objects.filter(id=booking_id).prefetch_related
                                                 (Prefetch('passengers',queryset=Passenger.objects.filter(email=email)))
                                             )
-                                    )
+                                    ) # tabla__atributo passengers__email=email  passenger.email
         
         if not booking_payment_code:
             return Response({"error":"El código de pago y/o email del pasajero no corresponde a la reseva dada."},
@@ -499,7 +499,9 @@ class BookingScalesView(APIView):
                 extra_meal=extra_meal,
             )
             
-
+            BookingScalePaymentCode.objects.create(
+                booking=newBooking
+            )
 
             # Crear los pasajeros (esto es común para todos los vuelos de la ruta)
             for passenger in passenger_info:
@@ -569,7 +571,153 @@ class BookingScalesView(APIView):
                 {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+ 
 
+class BookingScalesViewDetails(APIView):
+    def get(self, request, booking_id):
+        email = request.GET.get("email")
+
+        if not email:
+            return Response({"error": "El Correo es requerido para consultar una reserva."},status=status.HTTP_400_BAD_REQUEST)
+        
+        booking = BookingScales.objects.filter(id=booking_id, passenger__email=email).first()
+
+        if not booking:
+            return Response({"error": "Vuelo no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+        booking_details = BookingDetail.objects.filter(booking_id=booking_id)
+        
+        booking_payment = BookingScalePaymentCode.objects.filter(booking__id=booking_id).first()
+
+        response = {}
+
+        response["id"] = booking.id
+
+        response["booking_date"] = booking.booking_date
+        response["luggage_hand"] = booking.luggage_hand
+        response["luggage_hold"] = booking.luggage_hold
+        response["extra_luggage"] = booking.extra_luggage
+        response["meal_included"] = booking.meal_included
+        response["extra_meal"] = booking.extra_meal
+        response["total_price"] = booking.total_price
+        # Payment details
+        response["payment_status"] = booking_payment.payment_status
+        response["payment_code"] = booking_payment.payment_code
+        
+        passengers_list = {}
+        flights_list = {}
+        
+
+        for details in booking_details:
+            
+            flight = {}
+            flights_details = details.flightSeat.flight
+
+            flight["id"] = flights_details.id
+            flight["origin"] = {
+                "code": flights_details.origin.code,
+                "name": flights_details.origin.name
+                }
+            flight["destination"] = {
+                    "code": flights_details.destination.code,
+                    "name": flights_details.destination.name
+                }
+            flight["departure_time"] = flights_details.departure_time
+            flight["arrival_time"] = flights_details.arrival_time
+            flight["days_of_week"] = flights_details.days_of_week
+            
+            flight["stopover_order"] = details.stopover_order
+            flight["is_stopover"] = details.is_stopover
+
+            flights_list[flights_details.id] = flight
+
+
+            # Appends passengers data in booking details data
+            passenger = {}
+            passenger_details = details.passenger
+
+            passenger["first_name"] = passenger_details.first_name
+            passenger["last_name"] = passenger_details.last_name
+            passenger["email"] = passenger_details.email
+            passenger["date_of_birth"] = passenger_details.date_of_birth
+            passenger["is_infant"] = passenger_details.is_infant
+            passenger["seats"] = []
+            # Appends passengers seats data in booking details data
+            seats_details = details.flightSeat.seat
+            planes_details = details.flightSeat.flight.airplane
+            passenger["seats"].append({
+                    "seat": seats_details.seat_number, 
+                    "airplane": planes_details.name
+                })
+            if passenger_details.id in passengers_list.keys():
+               passengers_list[passenger_details.id]["seats"].append({
+                    "seat": seats_details.seat_number, 
+                    "airplane": planes_details.name
+                })
+               continue
+               
+            passengers_list[passenger_details.id] = passenger
+        
+        response["flights"] = flights_list.values()
+        response["passengers"] = passengers_list.values()
+        
+        return Response(response, status=status.HTTP_200_OK)
+        
+
+class SeatPrueba(APIView):
+    def get(self, request):
+        print("Hola mundo")
+        booking = BookingScales.objects.filter(id=5).first()
+       
+        pasajero = booking.passenger  
+ 
+ 
+        if not booking:
+            return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
+ 
+        # Usa la relación correcta
+        booking_details = BookingDetail.objects.filter(booking_id=booking.id)
+       
+        detalles = {}
+        pasajeros = []
+        vuelos_total = []
+       
+        detalles["booking_date"] = booking.booking_date
+        detalles["luggage_hand"] = booking.luggage_hand
+       
+       
+        for detalle in booking_details:
+           
+ 
+            vuelos_total_uno = {}
+            pasajero = {}
+            detalle_persona = detalle.passenger
+           #
+            pasajero["nombre"] = detalle_persona.first_name
+            pasajero["apellido"] = detalle_persona.last_name
+            pasajero["email"] = detalle_persona.email
+           
+            vuelo_detall = detalle.flightSeat.flight
+           
+            vuelos_total_uno["origen"]  =  vuelo_detall.origin.code
+            vuelos_total_uno["destino"]=  vuelo_detall.destination.code
+            vuelos_total_uno["id"]=  vuelo_detall.id   
+        
+            asiento_detall = detalle.flightSeat.seat
+ 
+            vuelos  = {
+                "id_vuelo" : vuelo_detall.id,
+                "asiento" : asiento_detall.seat_number
+            }
+            pasajero["asientos"] = vuelos
+ 
+            pasajeros.append(pasajero)
+            vuelos_total.append(vuelos_total_uno)
+ 
+        detalles["vuelos"] = vuelos_total
+        detalles["pasajeros"] = pasajeros
+       
+        return Response(detalles)
 
 class SeatAvailabilityView(APIView):
     def get(self, request, flight_id, date):
