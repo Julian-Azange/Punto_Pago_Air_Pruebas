@@ -461,22 +461,16 @@ class BookingScalesView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             
-            list_seat_flights = [d["flight_ids"] for d in passenger_info]
-            
-            #Validar, que tengan las mismas cantidad de asientos  y vuelos, que existan asientos disponibles, si no trae asientos asignarle automaticamente
-            #Fala la funcion, datos entrada list_seat_flights =  [{'1': 'E1', '2': 'E2'}, {'154': 'E1', '254': 'E2'}]
-            #{'id del Vuelo': 'Asiento seleecionado', '2': 'E2'}
 
-            
-            # print(list_seat_flights)
 
-            # return Response({"ok":"hola"}, status=status.HTTP_201_CREATED)
 
-            # Validar que la cantidad de vuelos y asientos proporcionados coincidan
- 
-            total_price = Decimal(
-                "0.00"
-            )  # Inicializar el precio total para toda la reserva
+            # Obtener la clase de asiento del primer pasajero
+            seat_class = passenger_info[0].get("seat_class")
+            if not seat_class:
+                return Response(
+                    {"error": "Falta la clase de asiento para los pasajeros."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
 
             # Reservar cada vuelo de la ruta
@@ -499,7 +493,16 @@ class BookingScalesView(APIView):
                 extra_meal=extra_meal,
             )
             
+            # Extraer la información de los vuelos involucrados
+            flight_details = []
+            for passenger in passenger_info:
+                for flight_id in passenger.get("flight_ids").keys():
+                    flight_instance = Flight.objects.get(id=int(flight_id))
+                    print(flight_instance.price)
+                    flight_details.append(flight_instance)
 
+            # Calcular el precio total de la reserva usando los detalles de los vuelos
+            newBooking.calculate_price(flight_details=flight_details, seat_class=seat_class)
 
             # Crear los pasajeros (esto es común para todos los vuelos de la ruta)
             for passenger in passenger_info:

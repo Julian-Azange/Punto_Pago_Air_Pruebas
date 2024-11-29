@@ -201,45 +201,43 @@ class BookingScales(models.Model):
     def __str__(self):
         return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
 
-    def calculate_price(self):
-        base_price = self.flight.price  # Precio base del vuelo
-        seat_price_multiplier = {
-            "first_class": Decimal("1.07"),
-            "business_class": Decimal("1.05"),
-            "economy_class": Decimal("1.00"),
-        }
+    def calculate_price(self, flight_details, seat_class):
+            # Define los multiplicadores según la clase de asiento
+            seat_price_multiplier = {
+                "first_class": Decimal("1.5"),
+                "business_class": Decimal("1.2"),
+                "economy_class": Decimal("1.00"),
+            }
 
-        # Ajuste por clase de asiento
-        seat_class_multiplier = seat_price_multiplier.get(
-            self.seat.seat_class, Decimal("1.0")
-        )
+            # Obtiene el multiplicador correspondiente a la clase seleccionada
+            seat_class_multiplier = seat_price_multiplier.get(seat_class, Decimal("1.0"))
 
-        # Precio por cantidad de pasajeros
-        price = base_price * seat_class_multiplier
-        for passenger in self.passengers.all():
-            if not passenger.is_infant:
-                price += base_price * Decimal(
-                    "0.10"
-                )  # 10% por cada pasajero mayor de 2 años
+            # Inicializa el precio total
+            total_price = Decimal("0.00")
 
-        # Ajuste por equipaje
-        if self.luggage_hold:
-            price += Decimal("50.00")  # Costo por equipaje de bodega
-        if self.extra_luggage > 0:
-            price += (
-                Decimal(self.extra_luggage) * Decimal("3.00") / Decimal("100.00")
-            )  # 3% por cada equipaje adicional
+            # Recorrer los vuelos para calcular el precio total
+            for flight in flight_details:
+                base_price = flight.price  # Precio del vuelo específico
+                print(flight.price)
+                total_price += base_price * seat_class_multiplier  # Ajuste por clase de asiento
+                print(total_price)
 
-        # Ajuste por comida adicional
-        if self.extra_meal > 0:
-            price += (
-                Decimal(self.extra_meal) * Decimal("1.00") / Decimal("100.00")
-            )  # 1% por cada comida adicional
+            # Ajuste por equipaje de bodega
+            if self.luggage_hold:
+                total_price += Decimal("50.000")  # Costo fijo por equipaje de bodega
 
-        # Guardar el precio total
-        self.total_price = price
-        self.save()
-        return self.total_price
+            # Ajuste por equipaje adicional
+            if self.extra_luggage > 0:
+                total_price += Decimal(self.extra_luggage) * Decimal("3.000") / Decimal("100.000")  # 3% del precio base por cada equipaje adicional
+
+            # Ajuste por comidas adicionales
+            if self.extra_meal > 0:
+                total_price += Decimal(self.extra_meal) * Decimal("1.000") / Decimal("100.000")  # 1% del precio base por cada comida adicional
+
+            # Guarda el precio total en la instancia y retorna el valor
+            self.total_price = total_price
+            self.save()
+            return self.total_price
 
 
 class FlightSeatInstance(models.Model):
@@ -249,7 +247,7 @@ class FlightSeatInstance(models.Model):
 
     def __str__(self):
         return (
-            f"{self.flight} - Seat {self.seat.seat} on Flight {self.date}"
+            f"{self.flight} - Seat {self.seat} on Flight {self.date}"
         )
 
 class BookingDetail(models.Model):
@@ -261,7 +259,7 @@ class BookingDetail(models.Model):
 
     def __str__(self):
         return (
-            f"{self.passenger} - Seat {self.seat.seat_number} on Flight {self.flight}"
+            f"{self.passenger} "
         )
 
 
