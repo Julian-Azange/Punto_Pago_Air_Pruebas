@@ -1,16 +1,18 @@
 
 
 from django.http import JsonResponse
-from .models import Airplane, FlightSeatInstance, Seat
+from .models import Airplane, Flight, FlightSeatInstance, Seat
 
 
-def get_available_seat(airplane_id, seat_class, departure_date, seat):
+def get_available_seat(flight, seat_class, departure_date, seat):
 
-    airplane = Airplane.objects.get(id=airplane_id)
+
+    
+    airplane = Airplane.objects.get(id=flight.airplane_id)
     if seat:
         occupied_seats = FlightSeatInstance.objects.filter(
             date=departure_date,
-            seat__airplane=airplane,
+            flight=flight,
             seat__id=seat
         )
 
