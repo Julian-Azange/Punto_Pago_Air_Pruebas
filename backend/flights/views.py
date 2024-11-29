@@ -109,7 +109,7 @@ class FlightSearchView(APIView):
                         "fecha_final": flight_details[-1]["arrival_time"],
                         "duracion": f"{int(hours)} horas, {int(minutes)} minutos",
                     
-                        "precio": f"{precio_total}",
+                        "precio": float(precio_total),
                         "vuelos": flight_details,
                     }
                 )
@@ -278,7 +278,7 @@ class BookingView(APIView):
 
             # Enviar correo con el código de pago 
 
-            self.send_email_payment_code(str(bookingPayment.payment_code))
+            #self.send_email_payment_code(str(bookingPayment.payment_code))
 
             # Serializar la respuesta
             serializer = BookingSerializer(booking)
