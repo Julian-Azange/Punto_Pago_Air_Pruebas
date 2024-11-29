@@ -1,4 +1,5 @@
 from decimal import Decimal
+from .utils import get_available_seat
 from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.exceptions import NotFound
@@ -8,8 +9,9 @@ from datetime import datetime, timedelta
 import traceback
 from .email_helper import EmailHelper
 from django.db.models import Prefetch
+from django.db.models import Count
 
-from .models import Airport, BookingDetail, BookingScales, Flight, FlightSeatInstance, Seat, Passenger, Booking, BookingPaymentCode
+from .models import Airplane, Airport, BookingDetail, BookingScales, Flight, FlightSeatInstance, Seat, Passenger, Booking, BookingPaymentCode
 from .serializers import (
     FlightSerializer,
     AirportSerializer,
@@ -516,7 +518,17 @@ class BookingScalesView(APIView):
                 for index, (flight, seat) in enumerate(passenger.get("flight_ids").items(), start=0):
 
                     flight_instance = Flight.objects.get(id=int(flight))
-                    seat_instance = Seat.objects.get(id=int(seat))     
+                    seat_class = passenger.get("seat_class")
+                    
+                    resp_seat = get_available_seat(flight_instance.id, seat_class, departure_date, seat)
+                    print(resp_seat)
+                    if "error" in resp_seat:
+                        return Response({"error": resp_seat["error"]}, status=status.HTTP_404_NOT_FOUND)
+                    
+                    seat_class = resp_seat.get("seat_id")
+
+
+                    seat_instance = Seat.objects.get(id=int(seat_class))     
 
                     #Validar si los asientos estan disponibles, esto es en newFlightSeat, con la fecha y vuelo y asiento
                     # o si no crear
@@ -557,3 +569,53 @@ class BookingScalesView(APIView):
                 {"error": f"Ocurrió un error al crear la reserva: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class SeatAvailabilityView(APIView):
+    def get(self, request, flight_id, date):
+        # Obtiene la aeronave
+        try:
+            flight = Flight.objects.get(id=flight_id)
+            airplane = flight.airplane
+        except Flight.DoesNotExist:
+            raise NotFound("Airplane not found")
+
+        # Cuenta de asientos disponibles por clase
+        seat_counts = {
+            "first_class_available": airplane.seat_count_first_class,
+            "business_class_available": airplane.seat_count_business_class,
+            "economy_class_available": airplane.seat_count_economy_class,
+        }
+
+        # Obtiene los asientos ya reservados para el avión y la fecha
+        reserved_seats = (
+            FlightSeatInstance.objects.filter(
+                seat__airplane=airplane,
+                date=date,
+            )
+            .values("seat__seat_class")
+            .annotate(count=Count("seat"))
+        )
+
+
+        # Resta los asientos reservados por clase
+        for seat in reserved_seats:
+            print("seat")
+            print(seat)
+            seat_class = seat["seat__seat_class"]
+            reserved_count = seat["count"]
+            if seat_class == "first_class":
+                seat_counts["first_class_available"] -= reserved_count
+            elif seat_class == "business_class":
+                seat_counts["business_class_available"] -= reserved_count
+            elif seat_class == "economy_class":
+                seat_counts["economy_class_available"] -= reserved_count
+
+        # Evita valores negativos
+        seat_counts = {k: { "cant_seat" : max(0, v)} for k, v in seat_counts.items()}
+        
+        seat_counts["first_class_available"]["percentage"] = 1.5
+        seat_counts["business_class_available"]["percentage"] = 1.2
+        seat_counts["economy_class_available"]["percentage"] = 1
+
+        return Response(seat_counts)

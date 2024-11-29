@@ -30,5 +30,6 @@ urlpatterns = [
     ),
     
     path("api/bookings_scales/", views.BookingScalesView.as_view(), name="booking_scales"),
+    path('api/flight/<int:flight_id>/availability/<str:date>/', views.SeatAvailabilityView.as_view(), name='seat-availability'),
     
 ]
