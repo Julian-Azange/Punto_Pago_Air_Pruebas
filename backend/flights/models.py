@@ -1,8 +1,8 @@
 from django.db import models
 from decimal import Decimal
 import uuid
-from enum import Enum
-
+from nanoid import generate
+from functools import partial
 
 class Airport(models.Model):
     code = models.CharField(max_length=3, unique=True)
@@ -197,6 +197,15 @@ class BookingScales(models.Model):
         default=0
     )  # Cantidad de comidas adicionales
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    
+    @property
+    def payment_code(self):
+        return BookingScalePaymentCode.objects.filter(booking__id=self.id).first().payment_code
+
+    @property
+    def payment_status(self):
+        return BookingScalePaymentCode.objects.filter(booking__id=self.id).first().payment_status
+
 
     def __str__(self):
         return f"Booking for Flight {self.flight} with {len(self.passengers.all())} passengers"
@@ -261,6 +270,32 @@ class BookingDetail(models.Model):
         return (
             f"{self.passenger} "
         )
+
+
+class BookingScalePaymentCode(models.Model):
+    class PaymentStatus(models.TextChoices):
+        PENDING = 'PENDIENTE'
+        PAID = 'PAGADO'  
+    # Attributes
+    payment_code = models.CharField(primary_key=True, max_length=10)
+    booking = models.ForeignKey(BookingScales, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    payment_status = models.CharField(max_length=10,
+                                      choices=PaymentStatus.choices,
+                                      default=PaymentStatus.PENDING.value)
+    
+    def save(self, *args, **kwargs):
+        self.payment_code = generate(size=10)
+        super(BookingScalePaymentCode, self).save(*args, **kwargs)
+
+
+    def get_payment_status(self) -> PaymentStatus:
+        return self.PaymentStatus(self.payment_status)
+
+
+    def __str__(self):
+        return f"Código de pago para el vuelo {self.booking.id}: {self.payment_code}"
+
 
 
 # TODO: añadir tabla de transaccion con cod -> verificar transaccion y pago
