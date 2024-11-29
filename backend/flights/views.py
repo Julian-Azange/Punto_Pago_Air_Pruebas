@@ -109,7 +109,7 @@ class FlightSearchView(APIView):
                         "fecha_final": flight_details[-1]["arrival_time"],
                         "duracion": f"{int(hours)} horas, {int(minutes)} minutos",
                     
-                        "precio": f"{precio_total} COP",
+                        "precio": float(precio_total),
                         "vuelos": flight_details,
                     }
                 )
@@ -522,7 +522,7 @@ class BookingScalesView(APIView):
                     flight_instance = Flight.objects.get(id=int(flight))
                     seat_class = passenger.get("seat_class")
                     
-                    resp_seat = get_available_seat(flight_instance.id, seat_class, departure_date, seat)
+                    resp_seat = get_available_seat(flight_instance, seat_class, departure_date, seat)
                     print(resp_seat)
                     if "error" in resp_seat:
                         return Response({"error": resp_seat["error"]}, status=status.HTTP_404_NOT_FOUND)
