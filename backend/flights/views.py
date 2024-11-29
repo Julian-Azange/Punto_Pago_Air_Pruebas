@@ -109,7 +109,7 @@ class FlightSearchView(APIView):
                         "fecha_final": flight_details[-1]["arrival_time"],
                         "duracion": f"{int(hours)} horas, {int(minutes)} minutos",
                     
-                        "precio": f"{precio_total} COP",
+                        "precio": f"{precio_total}",
                         "vuelos": flight_details,
                     }
                 )
