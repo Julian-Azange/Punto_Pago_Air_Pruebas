@@ -63,7 +63,7 @@ class Flight(models.Model):
     )  # Precio en COP
 
     def __str__(self):
-        return f"Flight from {self.origin} to {self.destination}"
+        return f"Flight from {self.origin} to {self.destination} {self.departure_time} -  {self.arrival_time} : {self.days_of_week} "
 
 
 class Passenger(models.Model):

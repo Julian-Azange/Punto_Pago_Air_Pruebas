@@ -73,7 +73,17 @@ class FlightSearchView(APIView):
             direct_flight_data + routes_with_stops, status=status.HTTP_200_OK
         )
 
+    def get_next_day(self, current_day):
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        current_index = days.index(current_day)
+        next_index = (current_index + 1) % 7
+        return days[next_index]
+    
     def find_routes_with_stops(self, origin, destination, day_of_week, travel_date):
+                
+        minimum_minutes_in_stops = 20
+        maximum_stops = 3
+        
         routes = []
         queue = deque([(origin, [origin], 0, day_of_week, travel_date, [])])
 
@@ -126,6 +136,23 @@ class FlightSearchView(APIView):
                         datetime.strptime(current_date, "%Y-%m-%d"),
                         flight.departure_time,
                     )
+                    
+                    
+                    
+                    if flight_details:
+                        stop_time = (departure_datetime - datetime.strptime(flight_details[-1]["arrival_time"], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60
+                        if stop_time < minimum_minutes_in_stops:
+                            continue
+                        
+                    if (("MDE" in path) and len(path) > maximum_stops + 2) or (("MDE" not in path) and len(path) > maximum_stops +1):
+                        continue
+                    
+                    
+                    if flight.destination.code == "MDE" or flight.destination.code == "EOH":
+                        path_to_add = ["MDE", "EOH"]
+                    else:
+                        path_to_add = [flight.destination.code]
+                        
                     arrival_datetime = departure_datetime + timedelta(
                         minutes=flight_duration
                     )
@@ -152,7 +179,7 @@ class FlightSearchView(APIView):
                         }
                     ]
 
-                    new_path = path + [flight.destination.code]
+                    new_path = path + path_to_add
                     queue.append(
                         (
                             flight.destination.code,
