@@ -31,7 +31,7 @@ urlpatterns = [
     
     path("api/bookings_scales/", views.BookingScalesView.as_view(), name="booking_scales"),
     path("api/bookings-scales/<int:booking_id>/", views.BookingScalesViewDetails.as_view(), name="booking_scales_details"),
-    # TODO: Buscar codigo de pago - Pagar - Notificación correo 
     path('api/flight/<int:flight_id>/availability/<str:date>/', views.SeatAvailabilityView.as_view(), name='seat-availability'),
-    
+    path("api/bookings-scales/payments/<int:booking_id>",views.BookingScalePaymentDetailView.as_view(), name="booking-scales-payment-detail"),
+    path("api/bookings-scales/payments/pay/<int:booking_id>",views.BookingScalePaymentView.as_view(), name="booking-scales-payment")
 ]

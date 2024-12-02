@@ -11,7 +11,7 @@ from .email_helper import EmailHelper
 from django.db.models import Prefetch
 from django.db.models import Count
 
-from .models import Airplane, Airport, BookingDetail, BookingScalePaymentCode, BookingScales, Flight, FlightSeatInstance, Seat, Passenger, Booking, BookingPaymentCode
+from .models import Airplane, Airport, BookingDetail, BookingScalePaymentCode, BookingScales, Flight, FlightSeatInstance, Seat, Passenger, Booking, BookingPaymentCode, BookingScalePaymentCode
 from .serializers import (
     FlightSerializer,
     AirportSerializer,
@@ -798,3 +798,89 @@ class SeatAvailabilityView(APIView):
         seat_counts["economy_class_available"]["percentage"] = 1
 
         return Response(seat_counts)
+    
+
+class BookingScalePaymentDetailView(APIView):
+
+    def get(self, request, booking_id) -> Response:
+        email = request.GET.get("email")
+
+        if not email:
+            return Response({"error":"Email es requerido para consultar código de pago de una reserva."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        
+        booking = BookingScales.objects.filter(id=booking_id, passenger__email=email)
+ 
+        if not booking:
+            return Response(
+                {"error": "Reservación con id y/o email dado no existe"},
+                status=status.HTTP_400_BAD_REQUEST)
+    
+        bookingPaymentCode = BookingScalePaymentCode.objects.filter(
+            booking__id=booking_id
+        ).first()
+
+        return Response({"code": bookingPaymentCode.payment_code}, 
+                        status=status.HTTP_200_OK)
+
+
+class BookingScalePaymentView(APIView):
+    def post(self, request, booking_id):
+        try:
+            data = request.data
+            email = request.GET.get("email")
+
+            payment_code = data.get("code")
+            total = data.get("total")
+
+            if not email:
+                return Response({"error":"Email es requerido para consultar código de pago de una reserva."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        
+            booking = BookingScales.objects.filter(id=booking_id, passenger__email=email).first()
+    
+            if not booking:
+                return Response(
+                    {"error": "Reservación con id y/o email dado no existe"},
+                    status=status.HTTP_400_BAD_REQUEST)
+            
+            bookingPaymentCode = BookingScalePaymentCode.objects.filter(
+                booking__id=booking_id, payment_code=payment_code
+            ).first()
+
+            if not bookingPaymentCode:
+                return Response(
+                    {"error": "Código de pago incorrecto o inválido."},
+                    status=status.HTTP_400_BAD_REQUEST)
+            
+            if bookingPaymentCode.payment_status==BookingPaymentCode.PaymentStatus.PAID.value:
+                return Response(
+                    {"error": "La reserva ya fue pagada"},
+                    status=status.HTTP_400_BAD_REQUEST)
+            
+            if booking.total_price!=total:
+                return Response(
+                    {"error": "Total a pagar es incorrecto, verifique nuevamente."},
+                    status=status.HTTP_400_BAD_REQUEST)
+
+            # Actualiza el estado de pago de la reserva
+
+            BookingScalePaymentCode.objects.filter(booking__id=booking_id, payment_code=payment_code).update(
+                    payment_status=BookingScalePaymentCode.PaymentStatus.PAID.value
+                )
+            
+            # TODO: Verificar envío de correo 
+            # self.send_booking_paid_notification()
+
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        except Exception as e:
+            logger.error(f"Error al pagar la reserva: {str(e)}")
+            logger.error(traceback.format_exc())
+            return Response(
+                {"error": f"Ocurrió un error al pagar la reserva: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    
+    def send_booking_paid_notification():
+        EmailHelper.send_booking_paid_notification
